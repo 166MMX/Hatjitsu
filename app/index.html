@@ -1,0 +1,228 @@
+<!doctype html >
+<html xmlns:ng="http://angularjs.org" lang="en" ng-app="pokerApp">
+<head>
+  <!--[if lte IE 8]>
+  <script>
+    document.createElement('ng-include');
+    document.createElement('ng-pluralize');
+    document.createElement('ng-view');
+
+    // Optionally these for CSS
+    document.createElement('ng:include');
+    document.createElement('ng:pluralize');
+    document.createElement('ng:view');
+  </script>
+  <![endif]-->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Hatjitsu :: Online Scrum Planning Poker for Agile Projects</title>
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+
+  <link rel="stylesheet" href="/css/app.css">
+
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/img/apple-touch-icon-144x144.png"/>
+  <link rel="apple-touch-icon-precomposed" sizes="114x114" href="/img/apple-touch-icon-114x114.png"/>
+  <link rel="apple-touch-icon-precomposed" sizes="72x72" href="/img/apple-touch-icon-72x72.png"/>
+  <link rel="apple-touch-icon-precomposed" href="/img/apple-touch-icon.png"/>
+
+  <link rel="apple-touch-startup-image" href="/img/apple-touch-startup-image.png" media="(device-width: 320px)"/>
+  <link rel="apple-touch-startup-image" href="/img/apple-touch-startup-image-768x1004.png"
+        media="(device-width: 768px) and (orientation: portrait)"/>
+  <link rel="apple-touch-startup-image" href="/img/apple-touch-startup-image-748x1024.png"
+        media="(device-width: 768px) and (orientation: landscape)"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+
+  <script src="/lib/modernizr.custom.07116.js"></script>
+  <script src="/js/testing.js"></script>
+
+</head>
+<body>
+<div class="body bg{{bodyState}}" ng-controller="MainCtrl">
+  <div class="container">
+    <header class="header">
+      <a href="/" title="Back to the Lobby">
+        <span class="header__logo{{logoState}}"></span>
+        <h1 class="header__text">Hatjitsu</h1>
+      </a>
+      <noscript>
+        <p>This site is <em>heavily</em> dependant upon JavaScript. If you don't have it enabled, you're not
+          going to have a Good Time.</p>
+      </noscript>
+      <div class="bg-mount"></div>
+    </header>
+
+    <div class="alert">
+      <div class="activity" ng-show="activity">Activity&hellip;</div>
+      <div class="notification socketMessage" ui-show="socketMessage" ng-bind="socketMessage"></div>
+      <div class="notification appError" ui-show="errorMessage" ng-bind="errorMessage"></div>
+      <div class="notification message" ui-show="message" ng-bind="message"></div>
+    </div>
+
+    <div class="content" ng-view>
+      <div class="lobby" style="display: none">
+        <h3 class="subheading">Distributed scrum <span>planning poker</span> for estimating agile projects.</h3>
+        <p>First person to <strong>create</strong> the room is the moderator. <strong>Share</strong> the url or
+          room number with other team members to <strong>join</strong> the room.</p>
+
+        <form>
+          <label class="subheading" for="roomfield">Enter room number</label>
+          <div class="row">
+            <input ng-model="room" ui-enter="enterRoom(room)" name="roomfield" id="roomfield" type="tel"
+                   maxlength="5" placeholder="room no" class="span2 roomUrl" autofocus/>
+            <button ng-click="enterRoom(room)" class="span2 btn"
+                    title="Join an existing planning poker room" ng-disabled="{{disableButtons}}"
+                    type="submit">Join room
+            </button>
+          </div>
+          <label for="createRoom">or</label>
+          <div class="row">
+            <button ng-click="createRoom()" id="createRoom" class="span1 btn"
+                    title="Create a new planning poker room" ng-disabled="{{disableButtons}}"
+                    type="button">Create new room
+            </button>
+          </div>
+        </form>
+
+      </div>
+      <div class="room" style="display: none" ng-init="configureRoom()">
+        <p class="roomNumber">Room: {{roomId}}</p>
+
+        <section class="cardPanel">
+          <div class="row cardPanel-meta">
+            <div class="span2 subheading">
+              <div ng-show="voter">
+                <span>Choose your estimate...</span>
+              </div>
+              <div ng-hide="voter">
+                <span>You have chosen not to vote.</span>
+              </div>
+            </div>
+            <div ng-switch on="showAdmin" class="span2 pullright">
+              <div ng-switch-when="true">
+                <div id="dd" class="dropdown-wrapper btn">
+                  <span>Mountain Goat pack</span>
+                  <ul class="dropdown">
+                    <li class="dropdown__item"><a href="#" ng-model="cardPack" id="deckGoat"
+                                                  ng-click="setCardPack('goat')">Mountain Goat</a>
+                    </li>
+                    <li class="dropdown__item"><a href="#" ng-model="cardPack" id="deckFib"
+                                                  ng-click="setCardPack('fib')">Fibonacci</a></li>
+                    <li class="dropdown__item"><a href="#" ng-model="cardPack" id="deckSeq"
+                                                  ng-click="setCardPack('seq')">Sequential</a></li>
+                    <li class="dropdown__item"><a href="#" ng-model="cardPack" id="deckPlay"
+                                                  ng-click="setCardPack('play')">Playing Cards</a>
+                    </li>
+                    <li class="dropdown__item"><a href="#" ng-model="cardPack" id="deckShirt"
+                                                  ng-click="setCardPack('tshirt')">T-Shirt</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cards{{cardsState}}">
+            <div ng-show="cards" ng-repeat="card in cards" ng-click="vote(card)" class="card"
+                 ng-class="{'card--selected' : card==myVote}" cardvalue>
+              {{card}}
+            </div>
+            <div ng-hide="cards" class="waiting">
+              No cards found
+            </div>
+          </div>
+
+        </section>
+
+        <section class="votePanel">
+          <div class="switch">
+            <input type="checkbox" ng-model="voter" ng-disabled="forceRevealDisable"
+                   ng-change="toggleVoter()">
+            <label class="btn" data-on="You are a voter" data-off="You are not a voter">I am voting</label>
+          </div>
+
+          <div ng-switch on="voter">
+
+            <div ng-switch-when="false">
+              <p>&nbsp;</p>
+            </div>
+
+            <div ng-switch-when="true">
+              <div ng-switch on="voted">
+                <p ng-switch-when="false">You haven't estimated yet</p>
+                <p ng-switch-when="true">Your current estimate: <b>{{myVote}}</b></p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="cards{{votingState}}" id="chosenCards">
+
+            <div ng-repeat="vote in votes" ng-click="unvote(vote.sessionId)" class="card card--2-sided vote"
+                 selectedvote>
+              <div class="card--side-1">x</div>
+              <div class="card--side-2" cardvalue>{{vote.visibleVote}}</div>
+            </div>
+            <div ng-repeat="i in placeholderVotes" class="card card--placeholder">
+              &nbsp;
+            </div>
+
+            <div ng-show="showAverage" class="voting-average">Average: <b>{{votingAverage}} (StdDev =
+              {{votingStandardDeviation}})</b></div>
+          </div>
+
+          <div ng-switch on="showAdmin">
+
+            <div ng-switch-when="true">
+              <div class="row">
+                <button ng-click="resetVote()" class="span2 btn" title="Start a new vote">
+                  <i class="icon icon-refresh"></i> Reset
+                </button>
+                <button ng-click="forceReveal()" class="span2 btn" ng-disabled="forceRevealDisable"
+                        title="Force a reveal of all cards if there are some stragglers">
+                  <i class="icon icon-exclamation-sign"></i> Reveal
+                </button>
+                <button ng-click="sortVotes()" class="span2 btn" ng-disabled="sortVotesDisable"
+                        title="Sort votes in order of cards in deck">
+                  <i class="icon"><span class="icon-sort"></span></i> Sort votes
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+      </div>
+
+    </div>
+
+    <footer class="footer">
+
+      <p>&copy; <a href="http://www.ubxd.com"
+                   title="Ruby on Rails, node, and iOS development in Cape Town">UBXD</a> 2012 - 2013; Built by <a
+          href="http://brea.kfa.st"
+          title="nodejs developer in Cape Town">@Jörg</a> &amp; <a
+          href="mailto:richard.archer@ubxd.com"
+          title="Software developer in Cape Town">@Rïch</a>. <strong><a
+          href="https://twitter.com/hatjitsu"
+          title="Feedback to us via Twitter">Feedback?</a></strong></p>
+
+    </footer>
+  </div>
+</div>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.11/socket.io.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.0.3/angular.min.js"></script>
+<script src="/lib/underscore.min.js"></script>
+<script src="/lib/jquery.cookie.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/controllers.js"></script>
+<script src="/js/directives.js"></script>
+<script src="/js/filters.js"></script>
+<script src="/js/services.js"></script>
+<script src="/js/dom.js"></script>
+
+</body>
+
+</html>
